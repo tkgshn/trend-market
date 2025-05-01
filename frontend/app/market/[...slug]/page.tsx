@@ -183,13 +183,10 @@ export default function Page({ params }: { params: { slug: string } }) {
 			alert("投票するにはウォレットを接続してください。");
 			return;
 		}
-		if (!isDiscussionCompleted) return;
-
 		setMarketData((prevData) => {
 			const change = 0.1; // 10%変化させて分かりやすく
 			let newYesPrice = prevData.yesPrice;
 			let newNoPrice = prevData.noPrice;
-
 			if (vote === "yes") {
 				newYesPrice = Math.min(newYesPrice + change, 1);
 				newNoPrice = Math.max(newNoPrice - change, 0);
@@ -197,11 +194,9 @@ export default function Page({ params }: { params: { slug: string } }) {
 				newYesPrice = Math.max(newYesPrice - change, 0);
 				newNoPrice = Math.min(newNoPrice + change, 1);
 			}
-
 			const total = newYesPrice + newNoPrice;
 			const newYesPercentage = total > 0 ? (newYesPrice / total) * 100 : 0;
 			const newNoPercentage = total > 0 ? (newNoPrice / total) * 100 : 0;
-
 			return {
 				...prevData,
 				yesPrice: newYesPrice,
@@ -350,7 +345,7 @@ export default function Page({ params }: { params: { slug: string } }) {
 										variant="outline"
 										className="w-full justify-between bg-green-900 hover:bg-green-800 border-green-700 text-white font-bold"
 										onClick={() => handleVote("yes")}
-										disabled={!isDiscussionCompleted || !isWalletConnected}
+										disabled={!isWalletConnected}
 									>
 										Yes{" "}
 										<span className="ml-1 text-green-400">
@@ -362,7 +357,7 @@ export default function Page({ params }: { params: { slug: string } }) {
 										variant="outline"
 										className="w-full justify-between bg-red-900 hover:bg-red-800 border-red-700 text-white font-bold"
 										onClick={() => handleVote("no")}
-										disabled={!isDiscussionCompleted || !isWalletConnected}
+										disabled={!isWalletConnected}
 									>
 										No{" "}
 										<span className="ml-1 text-red-400">
