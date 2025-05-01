@@ -1,25 +1,21 @@
+import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-	baseURL: "https://api.red-pill.ai/v1",
-	apiKey: "sk-J9zAgRQb2r3gHW0RmZMf5XBiDwJFo20iJK9Z9jrMLb7jKvkW",
-});
-import { NextResponse } from "next/server";
-
 export async function POST(request: Request) {
-	console.log("request received");
-	const res = await request.json();
+	const { systemMessage, userMessage } = await request.json();
+
+	const openai = new OpenAI({
+		apiKey: process.env.OPENAI_API_KEY,
+	});
+
 	const completion = await openai.chat.completions.create({
-		model: "gpt-4o",
+		model: "gpt-4o", // 必要に応じて "gpt-3.5-turbo" などに変更
 		messages: [
-			{ role: "system", content: res.systemMessage },
-			{
-				role: "user",
-				content: res.userMessage,
-			},
+			{ role: "system", content: systemMessage },
+			{ role: "user", content: userMessage },
 		],
 	});
-	console.log(completion.choices[0].message);
+
 	return NextResponse.json({
 		message: completion.choices[0].message,
 	});
