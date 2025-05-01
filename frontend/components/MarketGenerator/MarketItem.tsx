@@ -37,8 +37,8 @@ export const MarketItem: React.FC<MarketItemProps> = ({
 	noPrice,
 	attention,
 	volume,
-	providers,
-	oracles,
+	providers = [],
+	oracles = [],
 	deployedTxHash,
 }) => {
 	const yesPercentage = (yesPrice / (yesPrice + noPrice)) * 100;
