@@ -16,46 +16,11 @@ import { ProviderIcon } from "@/components/Body/Body";
 import { Progress } from "@/components/ui/progress";
 import { motion } from "framer-motion";
 import { Input } from "@/components/ui/input";
-
-import { VerificationLevel, IDKitWidget, useIDKit } from "@worldcoin/idkit";
-import type { ISuccessResult } from "@worldcoin/idkit";
-import { verify } from "@/app/actions/verify";
+import { useDynamicContext } from "@/contexts/DynamicContext";
 
 export default function Page({ params }: { params: { slug: string } }) {
-	const app_id = process.env.NEXT_PUBLIC_WLD_APP_ID as `app_${string}`;
-	const action = process.env.NEXT_PUBLIC_WLD_ACTION;
-
-	if (!app_id) {
-		throw new Error("app_id is not set in environment variables!");
-	}
-	if (!action) {
-		throw new Error("action is not set in environment variables!");
-	}
-
-
-	const [isVerified, setIsVerified] = useState(false);
-
-	const onSuccess = (result: ISuccessResult) => {
-		setIsVerified(true);
-		window.alert(
-			"World IDでの認証に成功しました！あなたのnullifierハッシュは: " +
-				result.nullifier_hash
-		);
-	};
-
-	const handleProof = async (result: ISuccessResult) => {
-		console.log(
-			"IDKitから受け取ったプルーフをバックエンドに送信します:\n",
-			JSON.stringify(result)
-		);
-		const data = await verify(result);
-		if (data.success) {
-			console.log("バックエンドからの成功レスポンス:\n", JSON.stringify(data));
-			setIsVerified(true);
-		} else {
-			throw new Error(`認証に失敗しました: ${data.detail}`);
-		}
-	};
+	const { primaryWallet } = useDynamicContext ? useDynamicContext() : { primaryWallet: null };
+	const isWalletConnected = !!primaryWallet;
 
 	const [marketData, setMarketData] = useState({
 		title: "Will Intel confirm a sale to Qualcomm by the end of the year?",
@@ -104,6 +69,7 @@ export default function Page({ params }: { params: { slug: string } }) {
 	const [discussionProgress, setDiscussionProgress] = useState(0);
 	const [isDiscussionExpanded, setIsDiscussionExpanded] = useState(true);
 	const [isDiscussionCompleted, setIsDiscussionCompleted] = useState(false);
+	const [voteMessage, setVoteMessage] = useState("");
 
 	const generateLLMOpinion = useCallback((llm: string, round: number) => {
 		const dummyOpinions = {
@@ -213,10 +179,14 @@ export default function Page({ params }: { params: { slug: string } }) {
 	}, [advanceDiscussion]);
 
 	const handleVote = (vote: "yes" | "no") => {
-		if (!isDiscussionCompleted) return; // Ignore votes until discussion is completed
+		if (!isWalletConnected) {
+			alert("投票するにはウォレットを接続してください。");
+			return;
+		}
+		if (!isDiscussionCompleted) return;
 
 		setMarketData((prevData) => {
-			const change = 0.01; // 1% change
+			const change = 0.1; // 10%変化させて分かりやすく
 			let newYesPrice = prevData.yesPrice;
 			let newNoPrice = prevData.noPrice;
 
@@ -229,8 +199,8 @@ export default function Page({ params }: { params: { slug: string } }) {
 			}
 
 			const total = newYesPrice + newNoPrice;
-			const newYesPercentage = (newYesPrice / total) * 100;
-			const newNoPercentage = (newNoPrice / total) * 100;
+			const newYesPercentage = total > 0 ? (newYesPrice / total) * 100 : 0;
+			const newNoPercentage = total > 0 ? (newNoPrice / total) * 100 : 0;
 
 			return {
 				...prevData,
@@ -240,6 +210,8 @@ export default function Page({ params }: { params: { slug: string } }) {
 				noPercentage: newNoPercentage,
 			};
 		});
+		setVoteMessage(vote === "yes" ? "Yesに投票しました！" : "Noに投票しました！");
+		setTimeout(() => setVoteMessage(""), 2000);
 	};
 
 	const calculateMajorityVote = () => {
@@ -279,11 +251,11 @@ export default function Page({ params }: { params: { slug: string } }) {
 	const [newComment, setNewComment] = useState("");
 
 	const handleAddComment = () => {
-		if (isVerified && newComment.trim()) {
+		if (isWalletConnected && newComment.trim()) {
 			setComments([...comments, newComment]);
 			setNewComment("");
-		} else if (!isVerified) {
-			alert("コメントを投稿するにはWorld IDで認証してください。");
+		} else if (!isWalletConnected) {
+			alert("コメントを投稿するにはウォレットを接続してください。");
 		}
 	};
 
@@ -371,32 +343,33 @@ export default function Page({ params }: { params: { slug: string } }) {
 
 							<div className="flex flex-col justify-between p-4 sm:w-1/3">
 								<div className="flex flex-col space-y-2 mb-4">
-									<>
-										<Button
-											variant="outline"
-											className="w-full justify-between bg-green-900 hover:bg-green-800 border-green-700 text-white font-bold"
-											onClick={() => handleVote("yes")}
-											disabled={!isDiscussionCompleted}
-										>
-											Yes{" "}
-											<span className="ml-1 text-green-400">
-												${marketData.yesPrice.toFixed(2)} (
-												{marketData.yesPercentage.toFixed(1)}%)
-											</span>
-										</Button>
-										<Button
-											variant="outline"
-											className="w-full justify-between bg-red-900 hover:bg-red-800 border-red-700 text-white font-bold"
-											onClick={() => handleVote("no")}
-											disabled={!isDiscussionCompleted}
-										>
-											No{" "}
-											<span className="ml-1 text-red-400">
-												${marketData.noPrice.toFixed(2)} (
-												{marketData.noPercentage.toFixed(1)}%)
-											</span>
-										</Button>
-									</>
+									{voteMessage && (
+										<div className="text-center text-lg text-blue-400 font-bold mb-2">{voteMessage}</div>
+									)}
+									<Button
+										variant="outline"
+										className="w-full justify-between bg-green-900 hover:bg-green-800 border-green-700 text-white font-bold"
+										onClick={() => handleVote("yes")}
+										disabled={!isDiscussionCompleted || !isWalletConnected}
+									>
+										Yes{" "}
+										<span className="ml-1 text-green-400">
+											${marketData.yesPrice.toFixed(2)} (
+											{marketData.yesPercentage.toFixed(1)}%)
+										</span>
+									</Button>
+									<Button
+										variant="outline"
+										className="w-full justify-between bg-red-900 hover:bg-red-800 border-red-700 text-white font-bold"
+										onClick={() => handleVote("no")}
+										disabled={!isDiscussionCompleted || !isWalletConnected}
+									>
+										No{" "}
+										<span className="ml-1 text-red-400">
+											${marketData.noPrice.toFixed(2)} (
+											{marketData.noPercentage.toFixed(1)}%)
+										</span>
+									</Button>
 								</div>
 								<div className="flex flex-col space-y-2">
 									<div className="flex flex-wrap gap-1">
@@ -518,13 +491,12 @@ export default function Page({ params }: { params: { slug: string } }) {
 										{llm.llm}
 									</h3>
 									<p
-										className={`text-lg font-bold ${
-											llm.finalConclusion === "Yes"
-												? "text-green-400"
-												: llm.finalConclusion === "No"
+										className={`text-lg font-bold ${llm.finalConclusion === "Yes"
+											? "text-green-400"
+											: llm.finalConclusion === "No"
 												? "text-red-400"
 												: "text-yellow-400"
-										}`}
+											}`}
 									>
 										{llm.finalConclusion}
 									</p>
@@ -573,7 +545,7 @@ export default function Page({ params }: { params: { slug: string } }) {
 									onChange={(e) => setNewComment(e.target.value)}
 									className="flex-grow bg-gray-700 text-white"
 								/>
-								{isVerified ? (
+								{isWalletConnected ? (
 									<Button
 										onClick={handleAddComment}
 										disabled={!newComment.trim()}
@@ -581,17 +553,7 @@ export default function Page({ params }: { params: { slug: string } }) {
 										投稿
 									</Button>
 								) : (
-									<IDKitWidget
-										action={action}
-										app_id={app_id}
-										onSuccess={onSuccess}
-										handleVerify={handleProof}
-										verification_level={VerificationLevel.Device}
-									>
-										{({ open }) => (
-											<Button onClick={open}>World IDで認証</Button>
-										)}
-									</IDKitWidget>
+									<Button disabled>ウォレットを接続してください</Button>
 								)}
 							</div>
 						</CardContent>
